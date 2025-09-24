@@ -19,19 +19,7 @@ app.use(cors());
 //pass incoming data
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }));
-// //sesseion config
-// const sessionConfig = {
-//     secret: 'thismustbeasecrete',
-//     resave: false,
-//     saveUninitialized: true,
-//     cookie: {
-//         httpOnly: true,
-//         expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
-//         maxAge: 1000 * 60 * 60 * 24 * 7,
-//     }
 
-// }
-// app.use(session(sessionConfig))
 
 //routes
 app.use("/api/v1/users", userRoutes);

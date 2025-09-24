@@ -1,6 +1,9 @@
 import asyncHandler from "express-async-handler";
 import Item from "../model/Item.js";
 import Group from "../model/Group.js";
+import Notification from "../model/notificationModel.js";
+import { io } from "../server.js";
+import User from "../model/User.js";
 
 export const createItemCtrl = asyncHandler(async (req, res) => {
     const { name, cost } = req.body;
@@ -36,6 +39,17 @@ export const createItemCtrl = asyncHandler(async (req, res) => {
     //push item to group
     group.items.push(item);
     await group.save();
+    const notif = await Notification.create({
+        group: groupId,
+        message: `A new item "${name}" added costing ₹${cost} in ${group.name}`,
+    });
+
+    console.log("📨 Notification created", notif);
+    io.to(groupId).emit("newNotification", notif);
+    console.log("🔔 Emitting notification via Socket.IO to group:", groupId);
+
+
+
 
     res.status(201).json({
         success: true,
@@ -123,3 +137,50 @@ export const deleteItemCtrl = asyncHandler(async (req, res) => {
 
 
 })
+
+
+export const bulkCreateItemsCtrl = asyncHandler(async (req, res) => {
+    const groupId = req.params.groupId;
+    const userId = req.userAuthId;
+    const { items } = req.body; // [{name, cost, qty?}]
+
+    const group = await Group.findById(groupId).populate('members');
+    if (!group) throw new Error("Group not found");
+
+    const isUserInGroup = group.members.some(m => m._id.toString() === userId);
+    if (!isUserInGroup) throw new Error("User not part of group");
+    const user = await User.findById(userId).fullname;
+    console.log(user);
+    const remainingMembers = group.members.filter(m => m._id.toString() !== userId);
+
+    // Create all items
+    const itemsToCreate = items.map(i => ({
+        name: i.name,
+        cost: i.cost,
+        purchasedBy: userId,
+        membersRemainingForPayment: remainingMembers.map(m => m._id),
+        paid: remainingMembers.length === 0,
+        group: group._id
+    }));
+
+    const createdItems = await Item.insertMany(itemsToCreate);
+
+    // Push to group
+    group.items.push(...createdItems.map(i => i._id));
+    await group.save();
+
+    // Notification
+    const notif = await Notification.create({
+        group: groupId,
+        message: `${user} added ${createdItems.length} items via receipt in ${group.name}`,
+    });
+    console.log("📨 Notification created", notif);
+    // Emit
+    io?.to(groupId).emit("newNotification", notif);
+
+    res.status(201).json({
+        success: true,
+        message: `${createdItems.length} items added successfully`,
+        data: createdItems
+    });
+});
