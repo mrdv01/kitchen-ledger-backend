@@ -149,7 +149,8 @@ export const bulkCreateItemsCtrl = asyncHandler(async (req, res) => {
 
     const isUserInGroup = group.members.some(m => m._id.toString() === userId);
     if (!isUserInGroup) throw new Error("User not part of group");
-    const user = await User.findById(userId).fullname;
+    console.log(userId);
+    const user = await User.findById(userId);
     console.log(user);
     const remainingMembers = group.members.filter(m => m._id.toString() !== userId);
 
@@ -172,7 +173,7 @@ export const bulkCreateItemsCtrl = asyncHandler(async (req, res) => {
     // Notification
     const notif = await Notification.create({
         group: groupId,
-        message: `${user} added ${createdItems.length} items via receipt in ${group.name}`,
+        message: `member added ${createdItems.length} items via receipt in ${group.name}`,
     });
     console.log("📨 Notification created", notif);
     // Emit
